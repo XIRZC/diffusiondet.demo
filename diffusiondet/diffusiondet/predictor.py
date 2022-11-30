@@ -5,6 +5,7 @@ import multiprocessing as mp
 from collections import deque
 import cv2
 import torch
+from copy import deepcopy
 
 from detectron2.data import MetadataCatalog
 from detectron2.engine.defaults import DefaultPredictor
@@ -47,6 +48,8 @@ class VisualizationDemo(object):
             vis_output (VisImage): the visualized image output.
         """
         vis_output = None
+        self.predictor.model.num_proposals = 300
+        self.predictor.model.sampling_timesteps = 4
         predictions = self.predictor(image)
         # Filter
         instances = predictions['instances']
