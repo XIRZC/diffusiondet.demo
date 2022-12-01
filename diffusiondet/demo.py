@@ -114,7 +114,7 @@ if __name__ == "__main__":
             # use PIL, to be consistent with evaluation
             img = read_image(path, format="BGR")
             start_time = time.time()
-            predictions, visualized_output = demo.run_on_image(img)
+            predictions, visualized_output, opencv_visualized_imgs = demo.run_on_image(img)
             logger.info(
                 "{}: {} in {:.2f}s".format(
                     path,
@@ -133,6 +133,16 @@ if __name__ == "__main__":
                     assert len(args.input) == 1, "Please specify a directory with args.output"
                     out_filename = args.output
                 visualized_output.save(out_filename)
+                d, f = out_filename.split('/')
+                for i in range(len(opencv_visualized_imgs)):
+                    if i < 4:
+                        cv2.imwrite(f"{d}/Prediction-SampleStep{i+1}-{f}", opencv_visualized_imgs[i])
+                    elif i < 7:
+                        cv2.imwrite(f"{d}/Filter-SampleStep{i-3}-{f}", opencv_visualized_imgs[i])
+                    elif i < 10:
+                        cv2.imwrite(f"{d}/DDIM-SampleStep{i-6}-{f}", opencv_visualized_imgs[i])
+                    elif i < 13:
+                        cv2.imwrite(f"{d}/Renewal-SampleStep{i-9}-{f}", opencv_visualized_imgs[i])
 
             else:
                 cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)

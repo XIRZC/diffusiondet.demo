@@ -4,6 +4,7 @@ import bisect
 import multiprocessing as mp
 from collections import deque
 import cv2
+import numpy as np
 import torch
 from copy import deepcopy
 
@@ -37,6 +38,13 @@ class VisualizationDemo(object):
         
         self.threshold = cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST  # workaround
 
+    def visualize_boxes(self, image, boxes):
+        boxes = boxes.detach().cpu().numpy()[0]
+        for box in boxes:
+            print(box[:2].astype(np.int32).tolist(), box[2:].astype(np.int32).tolist())
+            cv2.rectangle(image, box[:2].astype(np.int32).tolist(), box[2:].astype(np.int32).tolist(), (240, 155, 29), 1)
+        return image
+
     def run_on_image(self, image):
         """
         Args:
@@ -50,7 +58,22 @@ class VisualizationDemo(object):
         vis_output = None
         self.predictor.model.num_proposals = 300
         self.predictor.model.sampling_timesteps = 4
-        predictions = self.predictor(image)
+        # ensemble inference by multi-step ddim and box renewal
+        opencv_visualized_imgs = []
+        print(type(image), image.shape)
+        if self.predictor.model.use_ensemble and self.predictor.model.sampling_timesteps > 1:
+            predictions = self.predictor(image)
+            predictions, [ensemble_prediction, ensemble_filter, ensemble_ddim, ensemble_renewal] = self.predictor(image)
+            for step_prediction in ensemble_prediction:
+                opencv_visualized_imgs.append(self.visualize_boxes(image.copy(), step_prediction))
+            for step_filter in ensemble_filter:
+                opencv_visualized_imgs.append(self.visualize_boxes(image.copy(), step_filter))
+            for step_ddim in ensemble_ddim:
+                opencv_visualized_imgs.append(self.visualize_boxes(image.copy(), step_ddim))
+            for step_renewal in ensemble_renewal:
+                opencv_visualized_imgs.append(self.visualize_boxes(image.copy(), step_renewal))
+        else:
+            predictions = self.predictor(image)
         # Filter
         instances = predictions['instances']
         new_instances = instances[instances.scores > self.threshold]
@@ -72,7 +95,7 @@ class VisualizationDemo(object):
                 instances = predictions["instances"].to(self.cpu_device)
                 vis_output = visualizer.draw_instance_predictions(predictions=instances)
 
-        return predictions, vis_output
+        return predictions, vis_output, opencv_visualized_imgs
 
     def _frame_from_video(self, video):
         while video.isOpened():
