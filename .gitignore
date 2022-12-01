@@ -1,5 +1,6 @@
 diffusiondet/models
 diffusiondet/docker_build
+.idea
 __pycache__
 */__pycache__
 */*/__pycache__
