@@ -167,13 +167,23 @@ class DiffusionDet(nn.Module):
                 extract(self.sqrt_recipm1_alphas_cumprod, t, x_t.shape)
         )
         
-    def convert_boxes_format(self, boxes, images_whwh, format='noise2signal'):
+    def convert_boxes_format(self, boxes, images_whwh, images, image_sizes, format='noise2signal'):
         #print(f"=> origin data: {boxes}")
         if format == 'noise2signal':
             boxes = torch.clamp(boxes, min=-1 * self.scale, max=self.scale)
             boxes = ((boxes / self.scale) + 1) / 2
             boxes = box_cxcywh_to_xyxy(boxes)
             boxes = boxes * images_whwh[:, None, :]
+            n_boxes = []
+            for box, image, image_size in zip(boxes, images, image_sizes):
+                instances = Instances(image_size)
+                instances.pred_boxes = Boxes(box)
+                height = image.get("height", image_size[0])
+                width = image.get("width", image_size[1])
+                r = detector_postprocess(instances, height, width)
+                n_boxes.append(r.pred_boxes.tensor.unsqueeze(0))
+            boxes = torch.cat(n_boxes, dim=0)
+            print(boxes)
             #print(f"=> signal data: {boxes}")
         # signal2noise
         elif format == 'signal2noise':
@@ -215,7 +225,7 @@ class DiffusionDet(nn.Module):
 
         ensemble_score, ensemble_label, ensemble_coord = [], [], []
         # store xt signal format, transfer noise format to signal format if necessary
-        ensemble_prediction, ensemble_filter, ensemble_ddim, ensemble_renewal = [], [], [], []
+        ensemble_output, ensemble_output_filter, ensemble_prediction, ensemble_filter, ensemble_ddim, ensemble_renewal = [], [], [], [], [], []
         x_start = None
         for time, time_next in time_pairs:
             # Generate full batch timestep t
@@ -227,6 +237,7 @@ class DiffusionDet(nn.Module):
             # 1. Model Prediction
             preds, outputs_class, outputs_coord = self.model_predictions(backbone_feats, images_whwh, img, time_cond,
                                                                          self_cond, clip_x_start=clip_denoised)
+            ensemble_output.append(outputs_coord[-1])
             print(f"=> timestep {time}: outputs_coord.shape: {outputs_coord.shape}")
             # Get x_start by converting outputs_coord signal format into noise format, and then cacaluate pred_noise
             # Useful for subsequent DDIM Sampling from x_start to more random x_t by diffusion forward process
@@ -252,7 +263,7 @@ class DiffusionDet(nn.Module):
             # Note: filter either sample one step or more steps
             if self.box_renewal:  # filter
                 score_per_image, box_per_image = outputs_class[-1][0], outputs_coord[-1][0]
-                threshold = 0.5
+                threshold = 0.3
                 score_per_image = torch.sigmoid(score_per_image)
                 value, _ = torch.max(score_per_image, -1, keepdim=False)
                 keep_idx = value > threshold
@@ -261,6 +272,7 @@ class DiffusionDet(nn.Module):
                 x_start = x_start[:, keep_idx, :]
                 img = img[:, keep_idx, :]
                 ensemble_filter.append(x_start)
+                ensemble_output_filter.append(outputs_coord[-1][:, keep_idx, :])
 
 
             # 3. DDIM Sampling from Predicted x_start to more random x_t)(in code is img)
@@ -294,11 +306,14 @@ class DiffusionDet(nn.Module):
         if self.use_ensemble and self.sampling_timesteps > 1:
             # Use noise2signal format to convert boxes format
             for step_prediction in ensemble_prediction:
-                new_ensemble_prediction.append(self.convert_boxes_format(step_prediction, images_whwh, format='noise2signal'))
+                new_ensemble_prediction.append(self.convert_boxes_format(step_prediction, images_whwh, batched_inputs, images.image_sizes, format='noise2signal'))
             for step_filter, step_ddim, step_renewal in zip(ensemble_filter, ensemble_ddim, ensemble_renewal):
-                new_ensemble_filter.append(self.convert_boxes_format(step_filter, images_whwh, format='noise2signal'))
-                new_ensemble_ddim.append(self.convert_boxes_format(step_ddim, images_whwh, format='noise2signal'))
-                new_ensemble_renewal.append(self.convert_boxes_format(step_renewal, images_whwh, format='noise2signal'))
+                new_ensemble_filter.append(self.convert_boxes_format(step_filter, images_whwh, batched_inputs, images.image_sizes, format='noise2signal'))
+                new_ensemble_ddim.append(self.convert_boxes_format(step_ddim, images_whwh, batched_inputs, images.image_sizes, format='noise2signal'))
+                new_ensemble_renewal.append(self.convert_boxes_format(step_renewal, images_whwh, batched_inputs, images.image_sizes, format='noise2signal'))
+                
+        print(f"==> ensemble_output_filter: {ensemble_output_filter}")
+        print(f"==> new_ensemble_filter: {new_ensemble_filter}")
 
 
         # Organize these ensemble results and filter by NMS
@@ -572,8 +587,11 @@ class DiffusionDet(nn.Module):
         """
         Normalize, pad and batch the input images.
         """
+        # print(f"==> batched_inputs: {batched_inputs}")
         images = [self.normalizer(x["image"].to(self.device)) for x in batched_inputs]
+        # print(f"==> images: {images}")
         images = ImageList.from_tensors(images, self.size_divisibility)
+        #print(f"==> images: {images}")
 
         images_whwh = list()
         for bi in batched_inputs:

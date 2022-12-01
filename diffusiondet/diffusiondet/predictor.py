@@ -41,8 +41,8 @@ class VisualizationDemo(object):
     def visualize_boxes(self, image, boxes):
         boxes = boxes.detach().cpu().numpy()[0]
         for box in boxes:
-            print(box[:2].astype(np.int32).tolist(), box[2:].astype(np.int32).tolist())
-            cv2.rectangle(image, box[:2].astype(np.int32).tolist(), box[2:].astype(np.int32).tolist(), (240, 155, 29), 1)
+            #print(box[:2].astype(np.int32).tolist(), box[2:].astype(np.int32).tolist())
+            cv2.rectangle(image, box[:2].astype(np.int32).tolist(), box[2:].astype(np.int32).tolist(), (0, 0, 255), 1)
         return image
 
     def run_on_image(self, image):
@@ -58,11 +58,11 @@ class VisualizationDemo(object):
         vis_output = None
         self.predictor.model.num_proposals = 300
         self.predictor.model.sampling_timesteps = 4
+        self.threshold = 0.3
         # ensemble inference by multi-step ddim and box renewal
         opencv_visualized_imgs = []
         print(type(image), image.shape)
         if self.predictor.model.use_ensemble and self.predictor.model.sampling_timesteps > 1:
-            predictions = self.predictor(image)
             predictions, [ensemble_prediction, ensemble_filter, ensemble_ddim, ensemble_renewal] = self.predictor(image)
             for step_prediction in ensemble_prediction:
                 opencv_visualized_imgs.append(self.visualize_boxes(image.copy(), step_prediction))
