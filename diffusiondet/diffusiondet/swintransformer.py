@@ -727,7 +727,6 @@ def build_swintransformer_backbone(cfg, input_shape):
         frozen_stages=-1,
         use_checkpoint=cfg.MODEL.SWIN.USE_CHECKPOINT
     )
-    # print('Initializing', config['pretrained'])
     model.init_weights(config['pretrained'])
     return model
 

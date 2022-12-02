@@ -41,7 +41,6 @@ class VisualizationDemo(object):
     def visualize_boxes(self, image, boxes):
         boxes = boxes.detach().cpu().numpy()[0]
         for box in boxes:
-            #print(box[:2].astype(np.int32).tolist(), box[2:].astype(np.int32).tolist())
             cv2.rectangle(image, box[:2].astype(np.int32).tolist(), box[2:].astype(np.int32).tolist(), (0, 0, 255), 1)
         return image
 
@@ -61,9 +60,9 @@ class VisualizationDemo(object):
         self.threshold = 0.3
         # ensemble inference by multi-step ddim and box renewal
         opencv_visualized_imgs = []
-        print(type(image), image.shape)
         if self.predictor.model.use_ensemble and self.predictor.model.sampling_timesteps > 1:
-            predictions, [ensemble_prediction, ensemble_filter, ensemble_ddim, ensemble_renewal] = self.predictor(image)
+            predictions, [noise, ensemble_prediction, ensemble_filter, ensemble_ddim, ensemble_renewal] = self.predictor(image)
+            opencv_visualized_imgs.append(self.visualize_boxes(image.copy(), noise))
             for step_prediction in ensemble_prediction:
                 opencv_visualized_imgs.append(self.visualize_boxes(image.copy(), step_prediction))
             for step_filter in ensemble_filter:

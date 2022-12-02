@@ -168,7 +168,6 @@ class DiffusionDet(nn.Module):
         )
         
     def convert_boxes_format(self, boxes, images_whwh, images, image_sizes, format='noise2signal'):
-        #print(f"=> origin data: {boxes}")
         if format == 'noise2signal':
             boxes = torch.clamp(boxes, min=-1 * self.scale, max=self.scale)
             boxes = ((boxes / self.scale) + 1) / 2
@@ -183,8 +182,6 @@ class DiffusionDet(nn.Module):
                 r = detector_postprocess(instances, height, width)
                 n_boxes.append(r.pred_boxes.tensor.unsqueeze(0))
             boxes = torch.cat(n_boxes, dim=0)
-            print(boxes)
-            #print(f"=> signal data: {boxes}")
         # signal2noise
         elif format == 'signal2noise':
             boxes = boxes / images_whwh[:, None, :]
@@ -222,6 +219,7 @@ class DiffusionDet(nn.Module):
 
         # Generate xT by Guassian Distribution
         img = torch.randn(shape, device=self.device)
+        noise = (img * 2 - 1.)*self.scale
 
         ensemble_score, ensemble_label, ensemble_coord = [], [], []
         # store xt signal format, transfer noise format to signal format if necessary
@@ -238,7 +236,6 @@ class DiffusionDet(nn.Module):
             preds, outputs_class, outputs_coord = self.model_predictions(backbone_feats, images_whwh, img, time_cond,
                                                                          self_cond, clip_x_start=clip_denoised)
             ensemble_output.append(outputs_coord[-1])
-            print(f"=> timestep {time}: outputs_coord.shape: {outputs_coord.shape}")
             # Get x_start by converting outputs_coord signal format into noise format, and then cacaluate pred_noise
             # Useful for subsequent DDIM Sampling from x_start to more random x_t by diffusion forward process
             pred_noise, x_start = preds.pred_noise, preds.pred_x_start
@@ -305,6 +302,7 @@ class DiffusionDet(nn.Module):
         new_ensemble_prediction, new_ensemble_filter, new_ensemble_ddim, new_ensemble_renewal = [], [], [], []
         if self.use_ensemble and self.sampling_timesteps > 1:
             # Use noise2signal format to convert boxes format
+            noise = self.convert_boxes_format(noise, images_whwh, batched_inputs, images.image_sizes, format='noise2signal')
             for step_prediction in ensemble_prediction:
                 new_ensemble_prediction.append(self.convert_boxes_format(step_prediction, images_whwh, batched_inputs, images.image_sizes, format='noise2signal'))
             for step_filter, step_ddim, step_renewal in zip(ensemble_filter, ensemble_ddim, ensemble_renewal):
@@ -312,8 +310,6 @@ class DiffusionDet(nn.Module):
                 new_ensemble_ddim.append(self.convert_boxes_format(step_ddim, images_whwh, batched_inputs, images.image_sizes, format='noise2signal'))
                 new_ensemble_renewal.append(self.convert_boxes_format(step_renewal, images_whwh, batched_inputs, images.image_sizes, format='noise2signal'))
                 
-        print(f"==> ensemble_output_filter: {ensemble_output_filter}")
-        print(f"==> new_ensemble_filter: {new_ensemble_filter}")
 
 
         # Organize these ensemble results and filter by NMS
@@ -352,7 +348,7 @@ class DiffusionDet(nn.Module):
             
 
         if self.use_ensemble and self.sampling_timesteps > 1:
-            return [[processed_results[0], [new_ensemble_prediction, new_ensemble_filter, new_ensemble_ddim, new_ensemble_renewal]]]
+            return [[processed_results[0], [noise, new_ensemble_prediction, new_ensemble_filter, new_ensemble_ddim, new_ensemble_renewal]]]
         else:
             return processed_results
 
@@ -394,7 +390,6 @@ class DiffusionDet(nn.Module):
 
         # Prepare Proposals.
         if not self.training:
-            print(f"=> Inference by DiffusionDet...")
             results = self.ddim_sample(batched_inputs, features, images_whwh, images)
             return results
 
@@ -587,11 +582,8 @@ class DiffusionDet(nn.Module):
         """
         Normalize, pad and batch the input images.
         """
-        # print(f"==> batched_inputs: {batched_inputs}")
         images = [self.normalizer(x["image"].to(self.device)) for x in batched_inputs]
-        # print(f"==> images: {images}")
         images = ImageList.from_tensors(images, self.size_divisibility)
-        #print(f"==> images: {images}")
 
         images_whwh = list()
         for bi in batched_inputs:
