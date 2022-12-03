@@ -1,5 +1,6 @@
 diffusiondet/models
 diffusiondet/docker_build
+diffusiondet/infer_once_results
 .idea
 __pycache__
 */__pycache__

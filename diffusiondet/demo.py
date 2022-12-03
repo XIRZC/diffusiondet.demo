@@ -8,6 +8,7 @@ import tempfile
 import time
 import warnings
 import cv2
+import matplotlib.pyplot as plt
 import tqdm
 
 from detectron2.config import get_cfg
@@ -95,7 +96,46 @@ def test_opencv_video_format(codec, file_ext):
         return False
 
 def plot_multi_images_grids(opencv_visualized_imgs, visualized_output):
-    pass
+
+    title_array = ['Generated Random Noise Boxes', \
+            'Step 1 Prediction', 'Step 1 Filter', 'Step 1 DDIM', 'Step 1 Renewal', \
+            'Step 2 Prediction', 'Step 2 Filter', 'Step 2 DDIM', 'Step 2 Renewal', \
+            'Step 3 Prediction', 'Step 3 Filter', 'Step 3 DDIM', 'Step 3 Renewal', \
+            'Step 3 Prediction', 'All Steps Ensemble NMS Results'
+            ]
+    convert_array = [0, 1, 5, 8, 11, 2, 6, 9, 12, 3, 7, 10, 13, 4, 14]
+
+    # settings
+    nrows, ncols = 4, 4  # array of sub-plots
+    figsize = [15, 10]     # figure size, inches
+
+    # create figure (fig), and array of axes (ax)
+    fig, ax = plt.subplots(nrows=nrows,ncols=ncols,figsize=figsize)
+    ensemble_img = None
+
+    # plot simple raster image on each sub-plot
+    for i, axi in enumerate(ax.flat):
+        # i runs from 0 to (nrows*ncols-1)
+        # axi is equivalent with ax[rowid][colid]
+        if i < 14:
+            img = opencv_visualized_imgs[convert_array[i]]
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            axi.set_title(title_array[i])
+        elif i == 14:
+            img = opencv_visualized_imgs[convert_array[i]]
+            axi.set_title(title_array[i])
+            ensemble_img = img
+        else:
+            img = np.full_like(img, 255)
+        axi.imshow(img)
+        # write row/col indices as axes' title for identification
+        axi.axis('off')
+
+    plt.tight_layout()
+    plt.show()
+    plt.savefig(f"{args.output}/summary.jpg")
+    plt.imshow(ensemble_img)
+    plt.show()
 
 
 if __name__ == "__main__":
@@ -131,11 +171,11 @@ if __name__ == "__main__":
             if args.output:
                 if os.path.isdir(args.output):
                     assert os.path.isdir(args.output), args.output
-                    out_filename = os.path.join(args.output, f"EnsembleAllStep-{os.path.basename(path)}")
+                    out_filename = os.path.join(args.output, os.path.basename(path))
                 else:
                     assert len(args.input) == 1, "Please specify a directory with args.output"
                     out_filename = args.output
-                visualized_output.save(out_filename)
+                visualized_output.save(os.path.join(args.output, f"EnsembleAllStep-{os.path.basename(path)}"))
                 d, f = out_filename.split('/')
                 for i in range(len(opencv_visualized_imgs)):
                     if i < 1:
@@ -148,6 +188,7 @@ if __name__ == "__main__":
                         cv2.imwrite(f"{d}/DDIM-SampleStep{i-7}-{f}", opencv_visualized_imgs[i])
                     elif i < 14:
                         cv2.imwrite(f"{d}/Renewal-SampleStep{i-10}-{f}", opencv_visualized_imgs[i])
+                opencv_visualized_imgs.append(visualized_output.get_image())
                 plot_multi_images_grids(opencv_visualized_imgs, visualized_output)
 
             else:
