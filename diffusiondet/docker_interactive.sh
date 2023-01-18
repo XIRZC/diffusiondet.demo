@@ -1,4 +1,6 @@
 sudo docker run -it --rm \
+-p 7860:7860 \
+--net host \
 -e DISPLAY=$DISPLAY \
 -v /tmp/.X11-unix:/tmp/.X11-unix \
 -v ${PWD}/../:/work/ \

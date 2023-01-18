@@ -44,7 +44,7 @@ class VisualizationDemo(object):
             cv2.rectangle(image, box[:2].astype(np.int32).tolist(), box[2:].astype(np.int32).tolist(), (0, 0, 255), 1)
         return image
 
-    def run_on_image(self, image):
+    def run_on_image(self, num_boxes, num_steps, step_options, filter_threshold, nms_threshold, image):
         """
         Args:
             image (np.ndarray): an image of shape (H, W, C) (in BGR order).
@@ -55,22 +55,59 @@ class VisualizationDemo(object):
             vis_output (VisImage): the visualized image output.
         """
         vis_output = None
-        self.predictor.model.num_proposals = 300
-        self.predictor.model.sampling_timesteps = 4
+        self.predictor.model.num_proposals = num_boxes
+        self.predictor.model.sampling_timesteps = num_steps + 1
+        if 'Box Renewal' in step_options:
+            self.predictor.model.box_renewal = True
+            self.predictor.model.filter_threshold = filter_threshold
+        else: 
+            self.predictor.model.box_renewal = False
+        if 'DDIM' in step_options:
+            self.predictor.model.ddim = True
+        else:
+            self.predictor.model.ddim = False
+        if 'Ensembling with NMS' in step_options:
+            self.predictor.model.ensemble = True
+            self.predictor.model.nms_threshold = nms_threshold
+        else:
+            self.predictor.model.ensemble = False
+        
+        # Visualize Final Results Confidence Threshold
         self.threshold = 0.3
         # ensemble inference by multi-step ddim and box renewal
         opencv_visualized_imgs = []
+        gallery_mask = []
         if self.predictor.model.use_ensemble and self.predictor.model.sampling_timesteps > 1:
             predictions, [noise, ensemble_prediction, ensemble_filter, ensemble_ddim, ensemble_renewal] = self.predictor(image)
             opencv_visualized_imgs.append(self.visualize_boxes(image.copy(), noise))
+            gallery_mask.append(1)
             for step_prediction in ensemble_prediction:
                 opencv_visualized_imgs.append(self.visualize_boxes(image.copy(), step_prediction))
-            for step_filter in ensemble_filter:
-                opencv_visualized_imgs.append(self.visualize_boxes(image.copy(), step_filter))
-            for step_ddim in ensemble_ddim:
-                opencv_visualized_imgs.append(self.visualize_boxes(image.copy(), step_ddim))
-            for step_renewal in ensemble_renewal:
-                opencv_visualized_imgs.append(self.visualize_boxes(image.copy(), step_renewal))
+                gallery_mask.append(1)
+            if 'Box Renewal' in step_options:
+                for step_filter in ensemble_filter:
+                    opencv_visualized_imgs.append(self.visualize_boxes(image.copy(), step_filter))
+                    gallery_mask.append(1)
+            else:
+                for i in range(num_steps):
+                    opencv_visualized_imgs.append(np.full_like(image, 255))
+                    gallery_mask.append(0)
+            if 'DDIM' in step_options:
+                for step_ddim in ensemble_ddim:
+                    opencv_visualized_imgs.append(self.visualize_boxes(image.copy(), step_ddim))
+                    gallery_mask.append(1)
+            else:
+                for i in range(num_steps):
+                    opencv_visualized_imgs.append(np.full_like(image, 255))
+                    gallery_mask.append(0)
+            if 'Box Renewal' in step_options:
+                for step_renewal in ensemble_renewal:
+                    opencv_visualized_imgs.append(self.visualize_boxes(image.copy(), step_renewal))
+                    gallery_mask.append(1)
+            else:
+                for i in range(num_steps):
+                    opencv_visualized_imgs.append(np.full_like(image, 255))
+                    gallery_mask.append(0)
         else:
             predictions = self.predictor(image)
         # Filter
@@ -94,7 +131,7 @@ class VisualizationDemo(object):
                 instances = predictions["instances"].to(self.cpu_device)
                 vis_output = visualizer.draw_instance_predictions(predictions=instances)
 
-        return predictions, vis_output, opencv_visualized_imgs
+        return predictions, vis_output, opencv_visualized_imgs, gallery_mask
 
     def _frame_from_video(self, video):
         while video.isOpened():

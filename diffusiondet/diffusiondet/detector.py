@@ -245,7 +245,7 @@ class DiffusionDet(nn.Module):
             if time_next < 0:
                 img = x_start
                 # Add last step result into ensemble list
-                if self.use_ensemble and self.sampling_timesteps > 1:
+                if self.ensemble and self.use_ensemble and self.sampling_timesteps > 1:
                     box_pred_per_image, scores_per_image, labels_per_image, nms_results = self.inference(outputs_class[-1],
                                                                                             outputs_coord[-1],
                                                                                             images.image_sizes)
@@ -259,7 +259,7 @@ class DiffusionDet(nn.Module):
             # Note: filter either sample one step or more steps
             if self.box_renewal:  # filter
                 score_per_image, box_per_image = outputs_class[-1][0], outputs_coord[-1][0]
-                threshold = 0.3
+                threshold = self.filter_threshold
                 score_per_image = torch.sigmoid(score_per_image)
                 value, _ = torch.max(score_per_image, -1, keepdim=False)
                 keep_idx = value > threshold
@@ -271,15 +271,18 @@ class DiffusionDet(nn.Module):
 
 
             # 3. DDIM Sampling from Predicted x_start to more random x_t)(in code is img)
-            alpha = self.alphas_cumprod[time]
-            alpha_next = self.alphas_cumprod[time_next]
-            sigma = eta * ((1 - alpha / alpha_next) * (1 - alpha_next) / (1 - alpha)).sqrt()
-            c = (1 - alpha_next - sigma ** 2).sqrt()
-            noise = torch.randn_like(img)
-            img = x_start * alpha_next.sqrt() + \
-                  c * pred_noise + \
-                  sigma * noise
-            ensemble_ddim.append(img)
+            if self.ddim:
+                alpha = self.alphas_cumprod[time]
+                alpha_next = self.alphas_cumprod[time_next]
+                sigma = eta * ((1 - alpha / alpha_next) * (1 - alpha_next) / (1 - alpha)).sqrt()
+                c = (1 - alpha_next - sigma ** 2).sqrt()
+                noise = torch.randn_like(img)
+                img = x_start * alpha_next.sqrt() + \
+                      c * pred_noise + \
+                      sigma * noise
+                ensemble_ddim.append(img)
+            else:
+                img = x_start
 
             # 4. Box Renewal if Filter
             if self.box_renewal:  # filter
@@ -288,7 +291,7 @@ class DiffusionDet(nn.Module):
                 ensemble_renewal.append(img)
 
             # Process results by topk strategy and feed into ensemble list
-            if self.use_ensemble and self.sampling_timesteps > 1:
+            if self.ensemble and self.use_ensemble and self.sampling_timesteps > 1:
                 box_pred_per_image, scores_per_image, labels_per_image, nms_results = self.inference(outputs_class[-1],
                                                                                         outputs_coord[-1],
                                                                                         images.image_sizes)
@@ -303,20 +306,22 @@ class DiffusionDet(nn.Module):
             start_noise = self.convert_boxes_format(start_noise, images_whwh, batched_inputs, images.image_sizes, format='noise2signal')
             for step_prediction in ensemble_prediction:
                 new_ensemble_prediction.append(self.convert_boxes_format(step_prediction, images_whwh, batched_inputs, images.image_sizes, format='noise2signal'))
-            for step_filter, step_ddim, step_renewal in zip(ensemble_filter, ensemble_ddim, ensemble_renewal):
+            for step_filter in ensemble_filter:
                 new_ensemble_filter.append(self.convert_boxes_format(step_filter, images_whwh, batched_inputs, images.image_sizes, format='noise2signal'))
+            for step_ddim in ensemble_ddim:
                 new_ensemble_ddim.append(self.convert_boxes_format(step_ddim, images_whwh, batched_inputs, images.image_sizes, format='noise2signal'))
+            for step_renewal in ensemble_renewal:
                 new_ensemble_renewal.append(self.convert_boxes_format(step_renewal, images_whwh, batched_inputs, images.image_sizes, format='noise2signal'))
                 
 
 
         # Organize these ensemble results and filter by NMS
-        if self.use_ensemble and self.sampling_timesteps > 1:
+        if self.ensemble and self.use_ensemble and self.sampling_timesteps > 1:
             box_pred_per_image = torch.cat(ensemble_coord, dim=0)
             scores_per_image = torch.cat(ensemble_score, dim=0)
             labels_per_image = torch.cat(ensemble_label, dim=0)
             if self.use_nms:
-                keep = batched_nms(box_pred_per_image, scores_per_image, labels_per_image, 0.5)
+                keep = batched_nms(box_pred_per_image, scores_per_image, labels_per_image, self.nms_threshold)
                 box_pred_per_image = box_pred_per_image[keep]
                 scores_per_image = scores_per_image[keep]
                 labels_per_image = labels_per_image[keep]
@@ -345,10 +350,12 @@ class DiffusionDet(nn.Module):
                 processed_results.append({"instances": r})
             
 
-        if self.use_ensemble and self.sampling_timesteps > 1:
+        if not self.ensemble:
+            return [[processed_results[0], [start_noise, new_ensemble_prediction, new_ensemble_filter, new_ensemble_ddim, new_ensemble_renewal]]]
+        elif self.use_ensemble and self.sampling_timesteps > 1:
             return [[processed_results[0], [start_noise, new_ensemble_prediction, new_ensemble_filter, new_ensemble_ddim, new_ensemble_renewal]]]
         else:
-            return processed_results
+            return [processed_results[0]]
 
     # forward diffusion
     def q_sample(self, x_start, t, noise=None):
@@ -538,7 +545,7 @@ class DiffusionDet(nn.Module):
                 box_pred_per_image = box_pred_per_image.view(-1, 1, 4).repeat(1, self.num_classes, 1).view(-1, 4)
                 box_pred_per_image = box_pred_per_image[topk_indices]
 
-                if not self.use_ensemble and self.use_nms:
+                if self.use_nms:
                     keep = batched_nms(box_pred_per_image, scores_per_image, labels_per_image, 0.5)
                     box_pred_per_image = box_pred_per_image[keep]
                     scores_per_image = scores_per_image[keep]
@@ -549,7 +556,7 @@ class DiffusionDet(nn.Module):
                 result.pred_classes = labels_per_image
                 results.append(result)
 
-                if self.use_ensemble and self.sampling_timesteps > 1:
+                if self.ensemble and self.use_ensemble and self.sampling_timesteps > 1:
                     return box_pred_per_image, scores_per_image, labels_per_image, results
 
         else:
@@ -560,7 +567,7 @@ class DiffusionDet(nn.Module):
                     scores, labels, box_pred, image_sizes
             )):
 
-                if not self.use_ensemble and self.use_nms:
+                if self.use_nms:
                     keep = batched_nms(box_pred_per_image, scores_per_image, labels_per_image, 0.5)
                     box_pred_per_image = box_pred_per_image[keep]
                     scores_per_image = scores_per_image[keep]
@@ -571,7 +578,7 @@ class DiffusionDet(nn.Module):
                 result.pred_classes = labels_per_image
                 results.append(result)
 
-                if self.use_ensemble and self.sampling_timesteps > 1:
+                if self.ensemble and self.use_ensemble and self.sampling_timesteps > 1:
                     return box_pred_per_image, scores_per_image, labels_per_image, results
 
         return results
