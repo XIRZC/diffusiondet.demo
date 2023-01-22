@@ -25,6 +25,7 @@ RUN pip install ./docker_build/torch-1.12.0+cu113-cp37-cp37m-linux_x86_64.whl
 RUN pip install ./docker_build/torchvision-0.13.0+cu113-cp37-cp37m-linux_x86_64.whl
 RUN pip install 'git+https://ghproxy.com/https://github.com/facebookresearch/detectron2.git'
 RUN pip install ./docker_build/opencv_python-4.6.0.66-cp36-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
-RUN pip install gradio
+RUN pip install gradio timm
 RUN rm -rf ./docker_build
+# ENTRYPOINT ["python", "gradio_demo.py", "--config-file", "configs/diffdet.coco.swinbase.yaml", "--output", "infer_once_results"]
 # ENTRYPOINT ["python", "demo.py", "--config-file", "configs/diffdet.coco.swinbase.yaml", "--output", "infer_once_results"]

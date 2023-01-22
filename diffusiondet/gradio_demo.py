@@ -126,7 +126,7 @@ def plot_multi_images_grids(args, num_steps, step_options, opencv_visualized_img
         return [(f"{args.output}/{filename}", new_image_caption_array[i]) for i, filename in enumerate(new_image_filename_array)]
 
 
-def img2detections(num_boxes, num_steps, step_options, filter_threshold, nms_threshold, img):
+def img2detections(img, num_boxes, num_steps, step_options, filter_threshold, nms_threshold):
     args = get_parser().parse_args()
     cfg = setup_cfg(args)
 
@@ -151,19 +151,29 @@ def img2detections(num_boxes, num_steps, step_options, filter_threshold, nms_thr
 
 title = "DiffusionDet Demo"
 inputs = [
+    gr.Image(),
     gr.Slider(minimum=50, maximum=1000, step=50, value=300, label="Number of Dynamic Boxes during Inference(500 during Training)"),
     gr.Slider(minimum=0, maximum=9, step=1, value=3, label="Number of Progressive Refinement Sampling Steps during Inference"),
     gr.CheckboxGroup(choices=['DDIM', 'Box Renewal', 'Ensembling with NMS'], value=['DDIM', 'Box Renewal', 'Ensembling with NMS'], label="Options to Apply during each Progressive Refinement Step"),
     gr.Slider(minimum=0.10, maximum=0.80, step=0.02, value=0.30, label="Box Confidence Filtering Threshold during each Box Renewal Process"),
-    gr.Slider(minimum=0.30, maximum=0.70, step=0.05, value=0.50, label="NMS Threshold during Ensembling All Steps Prediction"),
-    gr.Image()
+    gr.Slider(minimum=0.30, maximum=0.70, step=0.05, value=0.50, label="NMS Threshold during Ensembling All Steps Prediction")
 ]
 outputs = [
     gr.Gallery()
 ]
 examples = [
-    [300, 3, ['DDIM', 'Box Renewal', 'Ensembling with NMS'], 0.30, 0.50, "./examples/COCO_val2014_000000581831.jpg"],
-    [300, 3, ['DDIM', 'Box Renewal', 'Ensembling with NMS'], 0.30, 0.50, "./examples/COCO_val2014_000000306693.jpg"]
+    ["./examples/COCO01.jpg", 300, 3, ['DDIM', 'Box Renewal', 'Ensembling with NMS'], 0.30, 0.50],
+    ["./examples/COCO02.jpg", 300, 3, ['DDIM', 'Box Renewal', 'Ensembling with NMS'], 0.30, 0.50],
+    ["./examples/LVIS01.jpg", 300, 3, ['DDIM', 'Box Renewal', 'Ensembling with NMS'], 0.30, 0.50],
+    ["./examples/LVIS02.jpg", 300, 3, ['DDIM', 'Box Renewal', 'Ensembling with NMS'], 0.30, 0.50],
+    ["./examples/LVIS03.jpg", 300, 3, ['DDIM', 'Box Renewal', 'Ensembling with NMS'], 0.30, 0.50],
+    ["./examples/LVIS04.jpg", 300, 3, ['DDIM', 'Box Renewal', 'Ensembling with NMS'], 0.30, 0.50],
+    ["./examples/LVIS05.jpg", 300, 3, ['DDIM', 'Box Renewal', 'Ensembling with NMS'], 0.30, 0.50],
+    ["./examples/LVIS06.jpg", 300, 3, ['DDIM', 'Box Renewal', 'Ensembling with NMS'], 0.30, 0.50],
+    ["./examples/LVIS07.jpg", 300, 3, ['DDIM', 'Box Renewal', 'Ensembling with NMS'], 0.30, 0.50],
+    ["./examples/LVIS08.jpg", 300, 3, ['DDIM', 'Box Renewal', 'Ensembling with NMS'], 0.30, 0.50],
+    ["./examples/LVIS09.jpg", 300, 3, ['DDIM', 'Box Renewal', 'Ensembling with NMS'], 0.30, 0.50],
+    ["./examples/LVIS10.jpg", 300, 3, ['DDIM', 'Box Renewal', 'Ensembling with NMS'], 0.30, 0.50],
 ]
 
 demo = gr.Interface(
