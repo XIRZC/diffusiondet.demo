@@ -22,6 +22,11 @@ from diffusiondet.util.model_ema import add_model_ema_configs, may_build_model_e
 
 # constants
 WINDOW_NAME = "COCO detections"
+NUM_BOXES_DEFAULT = 300
+NUM_STEPS_DEFAULT = 3
+STEP_OPTIONS_DEFAULT = ["DDIM", "Box Renewal", "Ensembling with NMS"]
+FILTER_THRESHOLD_DEFAULT = 0.3
+NMS_THRESHOLD_DEFAULT = 0.5
 
 
 def setup_cfg(args):
@@ -157,7 +162,9 @@ if __name__ == "__main__":
             # use PIL, to be consistent with evaluation
             img = read_image(path, format="BGR")
             start_time = time.time()
-            predictions, visualized_output, opencv_visualized_imgs = demo.run_on_image(img)
+            predictions, visualized_output, opencv_visualized_imgs, _ = \
+                demo.run_on_image(NUM_BOXES_DEFAULT, NUM_STEPS_DEFAULT, STEP_OPTIONS_DEFAULT, \
+                     FILTER_THRESHOLD_DEFAULT, NMS_THRESHOLD_DEFAULT, img)
             logger.info(
                 "{}: {} in {:.2f}s".format(
                     path,

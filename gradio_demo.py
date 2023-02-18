@@ -184,4 +184,4 @@ demo = gr.Interface(
     examples=examples
 )
 
-demo.launch()
+demo.launch(share=True)
