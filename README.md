@@ -16,7 +16,7 @@ conda activate diffusiondet
 pip install 'git+https://ghproxy.com/https://github.com/facebookresearch/detectron2.git'
 pip install gradio
 # In Linux, prepare model weights by
-mkdir models && wget https://github.com/ShoufaChen/DiffusionDet/releases/download/v0.1/diffdet_coco_swinbase.pth ./models/
+mkdir models && wget https://ghproxy.com/https://github.com/ShoufaChen/DiffusionDet/releases/download/v0.1/diffdet_coco_swinbase.pth -P ./models/
 # In Windows, prepare model weights manually
 ```
 
