@@ -27,8 +27,8 @@ RUN pip install 'git+https://ghproxy.com/https://github.com/facebookresearch/det
 RUN pip install ./docker_build/opencv_python-4.6.0.66-cp36-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
 RUN pip install gradio timm
 RUN rm -rf ./docker_build
-# model-executable-v1.0
+# model-executable-v2.0
 ENTRYPOINT ["python", "gradio_demo.py", "--config-file", "configs/diffdet.coco.swinbase.yaml", "--output", "infer_once_results"]
 # model-executable-v0.1
 # ENTRYPOINT ["python", "demo.py", "--config-file", "configs/diffdet.coco.swinbase.yaml", "--output", "infer_once_results"]
-# model-interactive-1.0 with no entrypoint
+# model-interactive-2.0 with no entrypoint
