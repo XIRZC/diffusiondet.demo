@@ -2,9 +2,11 @@
 
 This is just a simple demo application built by gradio.
 
+![DiffusionDet Gradio Interface](./banner.png)
+
 ## Environment Preparation
 
-You can just refer to [DiffusionDet](https://github.com/ShoufaChen/DiffusionDet) for basic environment preparation, where we just add gradio package additionally.
+You can just refer to [DiffusionDet](https://github.com/ShoufaChen/DiffusionDet/blob/main/GETTING_STARTED.md#installation) for basic environment preparation, where we just add gradio package additionally.
 
 Specifically,
 
@@ -12,10 +14,10 @@ Specifically,
 conda create -n diffusiondet python=3.7
 conda activate diffusiondet
 pip install 'git+https://ghproxy.com/https://github.com/facebookresearch/detectron2.git'
-pip install gradio timm
+pip install gradio
 ```
 
-Otherwise, you can just use our docker image hosted on AliYun.
+Otherwise, you can just use our docker image hosted on AliYun, and the correponding Dockerfile is located at [here](https://github.com/XIRZC/diffusiondet.demo/blob/main/Dockerfile).
 
 ``` Shell
 docker pull registry.cn-hangzhou.aliyuncs.com/mrxir/diffusiondet.demo:model-executable-v2.0
@@ -25,10 +27,12 @@ docker pull registry.cn-hangzhou.aliyuncs.com/mrxir/diffusiondet.demo:model-exec
 
 By local environment:
 
-- In Linux, just run `./gradio_demo.sh`
+- In Linux, just run `./gradio_demo.sh` under this repo root directory.
 - In Windows, just run `python gradio_demo.py` under created diffusiondet conda virtual environment
 
 By docker container:
 
 Just run `docker run -it --rm -p 7860:7860 registry.cn-hangzhou.aliyuncs.com/mrxir/diffusiondet.demo:model-executable-v2.0` in any OS terminal with docker installed.
+
+After deploy the gradio web application, you can just enter your [localhost](http://127.0.0.1:7860) in browser.
 
