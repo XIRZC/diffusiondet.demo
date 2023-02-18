@@ -1,7 +1,7 @@
-diffusiondet/models
-diffusiondet/docker_build
-diffusiondet/infer_once_results
-diffusiondet/flagged
+models
+docker_build
+infer_once_results
+flagged
 .idea
 __pycache__
 */__pycache__
