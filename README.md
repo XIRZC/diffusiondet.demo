@@ -1,6 +1,6 @@
 # Demonstration App for `DiffusionDet` with Denoising Process Visualization
 
-This is just a simple demo application built by gradio.
+This is just a simple demo application built by [Gradio](https://gradio.app/).
 
 ![DiffusionDet Gradio Interface](./banner.png)
 
